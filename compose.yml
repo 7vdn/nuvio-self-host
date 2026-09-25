@@ -111,8 +111,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    ports:
-      - 127.0.0.1:${KONG_HTTP_PORT}:8000/tcp
     volumes:
       - ./volumes/api/kong.yml:/home/kong/temp.yml:ro,z
       - ./volumes/api/kong-entrypoint.sh:/home/kong/kong-entrypoint.sh:ro,z
@@ -581,9 +579,6 @@ services:
       nofile:
         soft: 65535
         hard: 65535
-    ports:
-      - 127.0.0.1:${POSTGRES_PORT}:5432
-      - 127.0.0.1:${POOLER_PROXY_PORT_TRANSACTION}:6543
     volumes:
       - ./volumes/pooler/pooler.exs:/etc/pooler/pooler.exs:ro,z
     healthcheck:
