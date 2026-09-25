@@ -11,6 +11,68 @@ x-logging: &default-logging
 
 services:
 
+  migrations:
+    image: supabase/postgres:17.6.1.084
+    restart: "no"
+    exclude_from_hc: true
+    logging: *default-logging
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+    volumes:
+      - ./database/migrations:/migrations:ro
+    entrypoint:
+      - /bin/sh
+      - -c
+    command:
+      - |
+        set -eu
+
+        for migration in /migrations/*.sql; do
+          name=$$(basename "$$migration")
+          version=$${name%%_*}
+
+          table_exists=$$(psql \
+            -h db \
+            -p "$${POSTGRES_PORT}" \
+            -U supabase_admin \
+            -d "$${POSTGRES_DB}" \
+            -Atc "select to_regclass('nuvio_migrations.schema_migrations') is not null")
+
+          applied="f"
+
+          if [ "$$table_exists" = "t" ]; then
+            applied=$$(psql \
+              -h db \
+              -p "$${POSTGRES_PORT}" \
+              -U supabase_admin \
+              -d "$${POSTGRES_DB}" \
+              -Atc "select exists(
+                select 1
+                from nuvio_migrations.schema_migrations
+                where version = '$$version'
+              )")
+          fi
+
+          if [ "$$applied" = "t" ]; then
+            echo "SKIP: $$name"
+          else
+            echo "APPLY: $$name"
+            psql \
+              -h db \
+              -p "$${POSTGRES_PORT}" \
+              -U supabase_admin \
+              -d "$${POSTGRES_DB}" \
+              -v ON_ERROR_STOP=1 \
+              < "$$migration"
+          fi
+        done
+
+        echo "Nuvio migrations complete."
   account-dashboard:
     image: ${NUVIO_ACCOUNT_DASHBOARD_IMAGE:-ghcr.io/nuviomedia/nuvio-account-dashboard:latest}
     restart: unless-stopped
@@ -18,6 +80,8 @@ services:
     depends_on:
       kong:
         condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
     environment:
       NUVIO_SUPABASE_URL: ${SUPABASE_PUBLIC_URL}
       NUVIO_SUPABASE_ANON_KEY: ${ANON_KEY}
