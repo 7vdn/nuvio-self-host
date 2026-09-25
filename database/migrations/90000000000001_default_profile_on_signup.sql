@@ -50,7 +50,7 @@ WHERE NOT EXISTS (
 ON CONFLICT (user_id, profile_index) DO NOTHING;
 
 INSERT INTO nuvio_migrations.schema_migrations (version)
-VALUES ('00000000000011')
+VALUES ('90000000000001')
 ON CONFLICT (version) DO NOTHING;
 
 COMMIT;
